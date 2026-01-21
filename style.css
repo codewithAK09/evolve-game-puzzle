@@ -1,0 +1,54 @@
+:root {
+    --neon: #00f2ff;
+    --pink: #ff0055;
+    --bg: #020205;
+}
+
+body, html { margin: 0; padding: 0; background: var(--bg); color: white; overflow: hidden; height: 100vh; font-family: 'Michroma', sans-serif; cursor: none; }
+
+/* Canvas & Backgrounds */
+#pcb-canvas { position: fixed; inset: 0; z-index: 0; opacity: 0.95; }
+#fx-canvas { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+
+/* Mouse Follower */
+#cursor-follower {
+    position: fixed; width: 20px; height: 20px; background: var(--neon);
+    border-radius: 50%; pointer-events: none; z-index: 1000;
+    box-shadow: 0 0 30px var(--neon), 0 0 80px var(--neon), 0 0 12px rgba(0,242,255,0.6);
+    transform: translate(-50%, -50%); transition: transform 0.04s ease-out;
+}
+
+.screen-overlay {
+    position: fixed; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    z-index: 10; background: rgba(2, 2, 5, 0.7); /* Transparent enough to see PCB */
+}
+
+body.state-start #start-screen { display: flex; }
+body.state-game #game-screen { display: flex; }
+body.state-end #result-screen { display: flex; }
+
+/* Elements styling from your previous build */
+.hero-logo { font-family: 'Bungee'; font-size: 13rem; color: var(--neon); text-shadow: 0 0 34px var(--neon); margin: 0; }
+.main-title { font-family: 'Bungee'; font-size: 3rem; letter-spacing: 4px; color: #555; margin-bottom: 0; }
+
+/* start-screen tagline tweaks */
+.tagline { font-size: 2rem; color: #cfdff3; margin-top: 10px; }
+
+#maze-container {
+    display: grid; gap: 1px; border: 4px solid var(--neon);
+    background: #0a072d; padding: 4px; box-shadow: 0 0 40px rgba(0, 242, 255, 0.2);
+}
+
+.cell { width: 22px; height: 22px; background: #050508; }
+.wall { background: #fdfdfd; box-shadow: inset 0 0 8px #000; }
+
+.student { background: var(--neon); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); box-shadow: 0 0 15px var(--neon); }
+.home { background: var(--pink); box-shadow: 0 0 20px var(--pink); animation: pulse 1s infinite; }
+
+.action-btn {
+    background: var(--neon); color: black; border: none; padding: 20px 50px;
+    font-family: 'Bungee'; font-size: 1.2rem; cursor: pointer; margin-top: 30px;
+}
+
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }

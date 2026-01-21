@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVOLVE | The Challenge</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Michroma&display=swap" rel="stylesheet">
+</head>
+<body class="state-start">
+    <canvas id="pcb-canvas"></canvas>
+    <canvas id="fx-canvas"></canvas>
+    <div id="cursor-follower"></div>
+
+    <div id="start-screen" class="screen-overlay">
+        <div class="glitch-box">
+            <h1 class="main-title">ELECTROSPARK '26</h1>
+            <h2 class="hero-logo">EVOLVE</h2>
+            <p class="tagline">Prove Your Dedication For EVOLVE? Then take this challenge!</p>
+            <button class="action-btn" onclick="setGameState('game')">INITIALIZE MISSION</button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen-overlay">
+        <div class="hud">
+            <div class="timer-container">
+                <div class="timer-label">SYSTEM STABILITY</div>
+                <div class="progress-bar"><div id="progress-fill"></div></div>
+                <div id="timer-count">20s</div>
+            </div>
+        </div>
+        <div id="maze-container"></div>
+    </div>
+
+    <div id="result-screen" class="screen-overlay">
+        <div class="result-content">
+            <h1 id="status-text"></h1>
+            <div class="divider"></div>
+            <p id="sub-message"></p>
+            <button class="action-btn" onclick="location.reload()">REBOOT SYSTEM</button>
+        </div>
+    </div>
+
+    <audio id="popSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"></audio>
+    <script src="script.js"></script>
+</body>
+</html>
