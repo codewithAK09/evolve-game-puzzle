@@ -111,7 +111,7 @@ function initGame() {
     timerId = setInterval(() => {
         timeLeft--;
         document.getElementById('timer-count').innerText = timeLeft + 's';
-        document.getElementById('progress-fill').style.width = (timeLeft/2<0)*100 + '%';
+        document.getElementById('progress-fill').style.width = (timeLeft/20)*100 + '%';
         if(timeLeft <= 0) finish(false);
     }, 1000);
 }
@@ -153,21 +153,78 @@ function renderMaze() {
 }
 
 window.addEventListener('keydown', (e) => {
-    if(!document.body.classList.contains('state-game')) return;
-    let {x, y} = studentPos;
-    if(e.key==='ArrowUp'||e.key==='w') y--;
-    else if(e.key==='ArrowDown'||e.key==='s') y++;
-    else if(e.key==='ArrowLeft'||e.key==='a') x--;
-    else if(e.key==='ArrowRight'||e.key==='d') x++;
+    // replaced by directional hold/move logic below
+});
 
+// Movement helpers: allow a slightly faster continuous move while key is held
+let moveInterval = null;
+let currentDir = null; // 'up'|'down'|'left'|'right'
+const moveDelay = 120; // ms between repeated moves (slightly fast)
+
+function tryMove(dx, dy) {
+    if(!document.body.classList.contains('state-game')) return;
+    let x = studentPos.x + dx;
+    let y = studentPos.y + dy;
     if(maze[y] && maze[y][x] === 0) {
         studentPos = {x, y};
-        document.getElementById('popSound').currentTime = 0;
-        document.getElementById('popSound').play().catch(()=>{});
+        const pop = document.getElementById('popSound');
+        if(pop) { pop.currentTime = 0; pop.play().catch(()=>{}); }
         renderMaze();
         if(x === size-2 && y === size-2) finish(true);
     }
+}
+
+function moveOnceByDir(dir) {
+    if(dir === 'up') tryMove(0, -1);
+    else if(dir === 'down') tryMove(0, 1);
+    else if(dir === 'left') tryMove(-1, 0);
+    else if(dir === 'right') tryMove(1, 0);
+}
+
+function keyToDir(key) {
+    if(key === 'ArrowUp' || key === 'w') return 'up';
+    if(key === 'ArrowDown' || key === 's') return 'down';
+    if(key === 'ArrowLeft' || key === 'a') return 'left';
+    if(key === 'ArrowRight' || key === 'd') return 'right';
+    return null;
+}
+
+window.addEventListener('keydown', (e) => {
+    const dir = keyToDir(e.key);
+    if(!dir) return;
+    if(!document.body.classList.contains('state-game')) return;
+    // prevent creating multiple intervals on repeat
+    if(currentDir === dir && moveInterval) return;
+    currentDir = dir;
+    moveOnceByDir(dir); // immediate first move
+    if(moveInterval) clearInterval(moveInterval);
+    moveInterval = setInterval(() => moveOnceByDir(dir), moveDelay);
 });
+
+window.addEventListener('keyup', (e) => {
+    const dir = keyToDir(e.key);
+    if(dir && dir === currentDir) {
+        currentDir = null;
+        if(moveInterval) { clearInterval(moveInterval); moveInterval = null; }
+    }
+});
+
+// Fullscreen toggle button handling
+const fsBtn = document.getElementById('fullscreen-btn');
+if(fsBtn) {
+    function updateFsLabel() {
+        fsBtn.innerText = document.fullscreenElement ? '⤢' : '⛶';
+    }
+    fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(()=>{});
+        } else {
+            document.exitFullscreen().catch(()=>{});
+        }
+    });
+    document.addEventListener('fullscreenchange', updateFsLabel);
+    updateFsLabel();
+}
 
 function finish(win) {
     clearInterval(timerId);
