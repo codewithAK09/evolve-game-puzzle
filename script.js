@@ -98,12 +98,11 @@ function globalLoop() {
 globalLoop();
 
 // --- IMPOSSIBLE MAZE LOGIC ---
-const size = 33; // Grid size (must be odd)
+const size = 33; 
 let maze = [];
 let studentPos = { x: 1, y: 1 };
 let timeLeft = 25; 
 let timerId;
-const visibilityRadius = 4.5; // Fog of War distance
 
 function setGameState(state) {
     document.body.className = 'state-' + state;
@@ -129,18 +128,15 @@ function initGame() {
 }
 
 function generateImpossibleMaze() {
-    // 1 = wall, 0 = path
     maze = Array.from({length: size}, () => Array(size).fill(1));
 
     function carve(x, y) {
-        // Bias directions to create long, deceptive corridors
         const dirs = [[0,2],[2,0],[0,-2],[-2,0]].sort(()=>Math.random()-0.5);
         maze[y][x] = 0;
 
         for(let [dx, dy] of dirs) {
             let nx = x + dx, ny = y + dy;
             if(nx > 0 && nx < size-1 && ny > 0 && ny < size-1 && maze[ny][nx] === 1) {
-                // High chance to create long single paths with no intersections
                 maze[y + dy/2][x + dx/2] = 0;
                 carve(nx, ny);
             }
@@ -148,7 +144,6 @@ function generateImpossibleMaze() {
     }
     carve(1, 1);
 
-    // Hard-set Exit and ensure it's reachable but tricky
     maze[size-2][size-2] = 0;
     if(Math.random() > 0.5) maze[size-3][size-2] = 0; 
     else maze[size-2][size-3] = 0;
@@ -167,20 +162,11 @@ function renderMaze() {
             const div = document.createElement('div');
             div.className = 'cell ';
             
-            // Calculate Euclidean distance for Fog of War
-            const dist = Math.sqrt(Math.pow(x - studentPos.x, 2) + Math.pow(y - studentPos.y, 2));
+            // Maze visual state (Fog of War effects removed)
+            if(maze[y][x] === 1) div.classList.add('wall');
+            if(x === studentPos.x && y === studentPos.y) div.classList.add('student');
+            if(x === size-2 && y === size-2) div.classList.add('home');
             
-            if (dist > visibilityRadius) {
-                div.classList.add('shrouded'); 
-            } else {
-                if(maze[y][x] === 1) div.classList.add('wall');
-                if(x === studentPos.x && y === studentPos.y) div.classList.add('student');
-                if(x === size-2 && y === size-2) div.classList.add('home');
-                
-                // Opacity based on distance for smooth transition
-                const opacity = 1 - (dist / visibilityRadius);
-                div.style.filter = `brightness(${opacity * 1.5})`;
-            }
             container.appendChild(div);
         }
     }
@@ -200,7 +186,7 @@ function tryMove(dx, dy) {
         studentPos = {x, y};
         const pop = document.getElementById('popSound');
         if(pop) { pop.currentTime = 0; pop.play().catch(()=>{}); }
-        renderMaze(); // Re-render to update Fog of War
+        renderMaze(); 
         if(x === size-2 && y === size-2) finish(true);
     }
 }
@@ -244,27 +230,4 @@ function finish(win) {
     if(moveInterval) clearInterval(moveInterval);
     setGameState('end');
     
-    const statusText = document.getElementById('status-text');
-    const subMsg = document.getElementById('sub-message');
-    
-    if(statusText) {
-        statusText.innerText = win ? "SUCCESS" : "FAILED";
-        statusText.style.color = win ? "#00ff41" : "#ff0055";
-    }
-    
-    if(win) {
-        fxMode = 'cracker';
-        setInterval(() => {
-            for(let i=0; i<20; i++) particles.push(new Particle(Math.random()*fxCanvas.width, Math.random()*fxCanvas.height, '#00ff41', 8, 3));
-        }, 200);
-    }
-}
-
-// Fullscreen logic
-const fsBtn = document.getElementById('fullscreen-btn');
-if(fsBtn) {
-    fsBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
-        else document.exitFullscreen();
-    });
-}
+    const statusText = document.getElementById('status-text
