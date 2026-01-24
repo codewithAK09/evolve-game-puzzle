@@ -15,7 +15,7 @@ function resize() {
 window.onresize = resize;
 resize();
 
-// --- PCB TRACE ANIMATION ---
+// --- PCB TRACE ANIMATION (Matrix/Circuit Style) ---
 class PCBTrace {
     constructor() {
         this.reset();
@@ -45,6 +45,9 @@ class PCBTrace {
             this.history.forEach(p => pcbCtx.lineTo(p.x, p.y));
             pcbCtx.strokeStyle = '#7efcff';
             pcbCtx.lineWidth = 1.2;
+            pcbCtx.shadowBlur = 18;
+            pcbCtx.shadowColor = '#7efcff';
+            pcbCtx.globalCompositeOperation = 'lighter';
             pcbCtx.stroke();
         }
         pcbCtx.restore();
@@ -52,7 +55,7 @@ class PCBTrace {
 }
 for (let i = 0; i < 15; i++) traces.push(new PCBTrace());
 
-// --- FX & PARTICLES ---
+// --- MOUSE FOLLOW & FX ---
 window.addEventListener('mousemove', (e) => {
     if(cursor) {
         cursor.style.left = e.clientX + 'px';
@@ -71,8 +74,11 @@ class Particle {
     update() { this.x += this.vx; this.y += this.vy; this.life -= 0.015; }
     draw() {
         fxCtx.save();
-        fxCtx.globalAlpha = Math.max(0, this.life);
+        fxCtx.globalCompositeOperation = 'lighter';
+        fxCtx.globalAlpha = Math.max(0, Math.min(1, this.life));
         fxCtx.fillStyle = this.color;
+        fxCtx.shadowBlur = 18;
+        fxCtx.shadowColor = this.color;
         fxCtx.beginPath();
         fxCtx.arc(this.x, this.y, this.size, 0, Math.PI*2);
         fxCtx.fill();
@@ -97,11 +103,11 @@ function globalLoop() {
 }
 globalLoop();
 
-// --- IMPOSSIBLE MAZE LOGIC ---
-const size = 33; 
+// --- TOUGH MAZE LOGIC ---
+const size = 29;
 let maze = [];
 let studentPos = { x: 1, y: 1 };
-let timeLeft = 25; 
+let timeLeft = 20;
 let timerId;
 
 function setGameState(state) {
@@ -109,44 +115,51 @@ function setGameState(state) {
     if(state === 'game') { 
         fxMode = 'none'; 
         studentPos = { x: 1, y: 1 };
-        timeLeft = 25;
+        timeLeft = 20;
         initGame(); 
     }
 }
 
 function initGame() {
-    generateImpossibleMaze();
+    generateToughMaze();
     if(timerId) clearInterval(timerId);
     timerId = setInterval(() => {
         timeLeft--;
         const timeEl = document.getElementById('timer-count');
         const progressEl = document.getElementById('progress-fill');
         if(timeEl) timeEl.innerText = timeLeft + 's';
-        if(progressEl) progressEl.style.width = (timeLeft/25)*100 + '%';
+        if(progressEl) progressEl.style.width = (timeLeft/20)*100 + '%';
         if(timeLeft <= 0) finish(false);
     }, 1000);
 }
 
-function generateImpossibleMaze() {
+function generateToughMaze() {
+    // Fill with walls (1)
     maze = Array.from({length: size}, () => Array(size).fill(1));
 
     function carve(x, y) {
+        // Directions: Up, Down, Left, Right (2 steps)
         const dirs = [[0,2],[2,0],[0,-2],[-2,0]].sort(()=>Math.random()-0.5);
         maze[y][x] = 0;
 
         for(let [dx, dy] of dirs) {
             let nx = x + dx, ny = y + dy;
             if(nx > 0 && nx < size-1 && ny > 0 && ny < size-1 && maze[ny][nx] === 1) {
-                maze[y + dy/2][x + dx/2] = 0;
+                // TOUGHNESS TWEAK: 12% chance to skip a path, creating more complex dead ends
+                if (Math.random() > 0.88) continue; 
+                
+                maze[y + dy/2][x + dx/2] = 0; // Break the wall
                 carve(nx, ny);
             }
         }
     }
     carve(1, 1);
 
+    // Ensure the exit is actually open
     maze[size-2][size-2] = 0;
-    if(Math.random() > 0.5) maze[size-3][size-2] = 0; 
-    else maze[size-2][size-3] = 0;
+    if(maze[size-3][size-2] === 1 && maze[size-2][size-3] === 1) {
+        maze[size-3][size-2] = 0; // Force an entrance to the goal
+    }
 
     renderMaze();
 }
@@ -155,38 +168,32 @@ function renderMaze() {
     const container = document.getElementById('maze-container');
     if(!container) return;
     container.innerHTML = '';
-    container.style.gridTemplateColumns = `repeat(${size}, 20px)`;
-
+    container.style.gridTemplateColumns = `repeat(${size}, 22px)`;
     for(let y=0; y<size; y++){
         for(let x=0; x<size; x++){
             const div = document.createElement('div');
-            div.className = 'cell ';
-            
-            // Maze visual state (Fog of War effects removed)
-            if(maze[y][x] === 1) div.classList.add('wall');
+            div.className = 'cell ' + (maze[y][x] === 1 ? 'wall' : '');
             if(x === studentPos.x && y === studentPos.y) div.classList.add('student');
             if(x === size-2 && y === size-2) div.classList.add('home');
-            
             container.appendChild(div);
         }
     }
 }
 
-// --- MOVEMENT CONTROLS ---
+// --- MOVEMENT LOGIC ---
 let moveInterval = null;
 let currentDir = null; 
-const moveDelay = 110; 
+const moveDelay = 120; 
 
 function tryMove(dx, dy) {
     if(!document.body.classList.contains('state-game')) return;
     let x = studentPos.x + dx;
     let y = studentPos.y + dy;
-    
     if(maze[y] && maze[y][x] === 0) {
         studentPos = {x, y};
         const pop = document.getElementById('popSound');
         if(pop) { pop.currentTime = 0; pop.play().catch(()=>{}); }
-        renderMaze(); 
+        renderMaze();
         if(x === size-2 && y === size-2) finish(true);
     }
 }
@@ -225,9 +232,40 @@ window.addEventListener('keyup', (e) => {
     }
 });
 
+// Fullscreen Handling
+const fsBtn = document.getElementById('fullscreen-btn');
+if(fsBtn) {
+    fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(()=>{});
+        } else {
+            document.exitFullscreen().catch(()=>{});
+        }
+    });
+    document.addEventListener('fullscreenchange', () => {
+        fsBtn.innerText = document.fullscreenElement ? '⤢' : '⛶';
+    });
+}
+
 function finish(win) {
     clearInterval(timerId);
     if(moveInterval) clearInterval(moveInterval);
     setGameState('end');
+    const statusText = document.getElementById('status-text');
+    const subMsg = document.getElementById('sub-message');
     
-    const statusText = document.getElementById('status-text
+    if(statusText) {
+        statusText.innerText = win ? "SUCCESS" : "FAILED";
+        statusText.style.color = win ? "#00ff41" : "#ff0055";
+    }
+    if(subMsg) {
+        subMsg.innerText = win ? "Dedication proven. Welcome to EVOLVE!" : "Try hard if u want to join EVOLVE.";
+    }
+    
+    if(win) {
+        fxMode = 'cracker';
+        setInterval(() => {
+            for(let i=0; i<20; i++) particles.push(new Particle(Math.random()*fxCanvas.width, Math.random()*fxCanvas.height, '#00ff41', 8, 3));
+        }, 200);
+    }
+}
