@@ -15,9 +15,12 @@ function resize() {
 window.onresize = resize;
 resize();
 
-// --- PCB TRACE ANIMATION ---
+// --- PCB TRACE ANIMATION (Matrix/Circuit Style) ---
 class PCBTrace {
     constructor() {
+        this.reset();
+    }
+    reset() {
         this.x = Math.random() * pcbCanvas.width;
         this.y = Math.random() * pcbCanvas.height;
         this.vx = (Math.random() > 0.5 ? 2 : -2);
@@ -32,17 +35,21 @@ class PCBTrace {
             if (this.vx !== 0) { this.vy = (Math.random() > 0.5 ? 2 : -2); this.vx = 0; }
             else { this.vx = (Math.random() > 0.5 ? 2 : -2); this.vy = 0; }
         }
+        if(this.x < 0 || this.x > pcbCanvas.width || this.y < 0 || this.y > pcbCanvas.height) this.reset();
     }
     draw() {
         pcbCtx.save();
-        if (this.history.length > 0) pcbCtx.beginPath(), pcbCtx.moveTo(this.history[0].x, this.history[0].y);
-        this.history.forEach(p => pcbCtx.lineTo(p.x, p.y));
-        pcbCtx.strokeStyle = '#7efcff';
-        pcbCtx.lineWidth = 1.2;
-        pcbCtx.shadowBlur = 18;
-        pcbCtx.shadowColor = '#7efcff';
-        pcbCtx.globalCompositeOperation = 'lighter';
-        pcbCtx.stroke();
+        if (this.history.length > 0) {
+            pcbCtx.beginPath();
+            pcbCtx.moveTo(this.history[0].x, this.history[0].y);
+            this.history.forEach(p => pcbCtx.lineTo(p.x, p.y));
+            pcbCtx.strokeStyle = '#7efcff';
+            pcbCtx.lineWidth = 1.2;
+            pcbCtx.shadowBlur = 18;
+            pcbCtx.shadowColor = '#7efcff';
+            pcbCtx.globalCompositeOperation = 'lighter';
+            pcbCtx.stroke();
+        }
         pcbCtx.restore();
     }
 }
@@ -50,8 +57,10 @@ for (let i = 0; i < 15; i++) traces.push(new PCBTrace());
 
 // --- MOUSE FOLLOW & FX ---
 window.addEventListener('mousemove', (e) => {
-    cursor.style.left = e.clientX + 'px';
-    cursor.style.top = e.clientY + 'px';
+    if(cursor) {
+        cursor.style.left = e.clientX + 'px';
+        cursor.style.top = e.clientY + 'px';
+    }
     if (Math.random() > 0.3) particles.push(new Particle(e.clientX, e.clientY, '#00f2ff', 6, 4));
 });
 
@@ -94,7 +103,7 @@ function globalLoop() {
 }
 globalLoop();
 
-// --- GAME LOGIC (Restored from your version) ---
+// --- TOUGH MAZE LOGIC ---
 const size = 29;
 let maze = [];
 let studentPos = { x: 1, y: 1 };
@@ -103,42 +112,61 @@ let timerId;
 
 function setGameState(state) {
     document.body.className = 'state-' + state;
-    if(state === 'game') { fxMode = 'none'; initGame(); }
+    if(state === 'game') { 
+        fxMode = 'none'; 
+        studentPos = { x: 1, y: 1 };
+        timeLeft = 20;
+        initGame(); 
+    }
 }
 
 function initGame() {
     generateToughMaze();
+    if(timerId) clearInterval(timerId);
     timerId = setInterval(() => {
         timeLeft--;
-        document.getElementById('timer-count').innerText = timeLeft + 's';
-        document.getElementById('progress-fill').style.width = (timeLeft/20)*100 + '%';
+        const timeEl = document.getElementById('timer-count');
+        const progressEl = document.getElementById('progress-fill');
+        if(timeEl) timeEl.innerText = timeLeft + 's';
+        if(progressEl) progressEl.style.width = (timeLeft/20)*100 + '%';
         if(timeLeft <= 0) finish(false);
     }, 1000);
 }
 
 function generateToughMaze() {
+    // Fill with walls (1)
     maze = Array.from({length: size}, () => Array(size).fill(1));
+
     function carve(x, y) {
+        // Directions: Up, Down, Left, Right (2 steps)
         const dirs = [[0,2],[2,0],[0,-2],[-2,0]].sort(()=>Math.random()-0.5);
         maze[y][x] = 0;
+
         for(let [dx, dy] of dirs) {
-            let nx = x+dx, ny = y+dy;
-            if(nx>0 && nx<size-1 && ny>0 && ny<size-1 && maze[ny][nx] === 1) {
-                maze[y+dy/2][x+dx/2] = 0; carve(nx, ny);
+            let nx = x + dx, ny = y + dy;
+            if(nx > 0 && nx < size-1 && ny > 0 && ny < size-1 && maze[ny][nx] === 1) {
+                // TOUGHNESS TWEAK: 12% chance to skip a path, creating more complex dead ends
+                if (Math.random() > 0.88) continue; 
+                
+                maze[y + dy/2][x + dx/2] = 0; // Break the wall
+                carve(nx, ny);
             }
         }
     }
     carve(1, 1);
-    for(let i=0; i<8; i++) { // Increased fake paths
-        let rx = Math.floor(Math.random()*(size-4))+2;
-        let ry = Math.floor(Math.random()*(size-4))+2;
-        maze[ry][rx] = 0;
+
+    // Ensure the exit is actually open
+    maze[size-2][size-2] = 0;
+    if(maze[size-3][size-2] === 1 && maze[size-2][size-3] === 1) {
+        maze[size-3][size-2] = 0; // Force an entrance to the goal
     }
+
     renderMaze();
 }
 
 function renderMaze() {
     const container = document.getElementById('maze-container');
+    if(!container) return;
     container.innerHTML = '';
     container.style.gridTemplateColumns = `repeat(${size}, 22px)`;
     for(let y=0; y<size; y++){
@@ -152,14 +180,10 @@ function renderMaze() {
     }
 }
 
-window.addEventListener('keydown', (e) => {
-    // replaced by directional hold/move logic below
-});
-
-// Movement helpers: allow a slightly faster continuous move while key is held
+// --- MOVEMENT LOGIC ---
 let moveInterval = null;
-let currentDir = null; // 'up'|'down'|'left'|'right'
-const moveDelay = 120; // ms between repeated moves (slightly fast)
+let currentDir = null; 
+const moveDelay = 120; 
 
 function tryMove(dx, dy) {
     if(!document.body.classList.contains('state-game')) return;
@@ -182,21 +206,20 @@ function moveOnceByDir(dir) {
 }
 
 function keyToDir(key) {
-    if(key === 'ArrowUp' || key === 'w') return 'up';
-    if(key === 'ArrowDown' || key === 's') return 'down';
-    if(key === 'ArrowLeft' || key === 'a') return 'left';
-    if(key === 'ArrowRight' || key === 'd') return 'right';
+    const k = key.toLowerCase();
+    if(key === 'ArrowUp' || k === 'w') return 'up';
+    if(key === 'ArrowDown' || k === 's') return 'down';
+    if(key === 'ArrowLeft' || k === 'a') return 'left';
+    if(key === 'ArrowRight' || k === 'd') return 'right';
     return null;
 }
 
 window.addEventListener('keydown', (e) => {
     const dir = keyToDir(e.key);
-    if(!dir) return;
-    if(!document.body.classList.contains('state-game')) return;
-    // prevent creating multiple intervals on repeat
+    if(!dir || !document.body.classList.contains('state-game')) return;
     if(currentDir === dir && moveInterval) return;
     currentDir = dir;
-    moveOnceByDir(dir); // immediate first move
+    moveOnceByDir(dir);
     if(moveInterval) clearInterval(moveInterval);
     moveInterval = setInterval(() => moveOnceByDir(dir), moveDelay);
 });
@@ -209,12 +232,9 @@ window.addEventListener('keyup', (e) => {
     }
 });
 
-// Fullscreen toggle button handling
+// Fullscreen Handling
 const fsBtn = document.getElementById('fullscreen-btn');
 if(fsBtn) {
-    function updateFsLabel() {
-        fsBtn.innerText = document.fullscreenElement ? '⤢' : '⛶';
-    }
     fsBtn.addEventListener('click', () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(()=>{});
@@ -222,20 +242,30 @@ if(fsBtn) {
             document.exitFullscreen().catch(()=>{});
         }
     });
-    document.addEventListener('fullscreenchange', updateFsLabel);
-    updateFsLabel();
+    document.addEventListener('fullscreenchange', () => {
+        fsBtn.innerText = document.fullscreenElement ? '⤢' : '⛶';
+    });
 }
 
 function finish(win) {
     clearInterval(timerId);
+    if(moveInterval) clearInterval(moveInterval);
     setGameState('end');
-    document.getElementById('status-text').innerText = win ? "SUCCESS" : "FAILED";
-    document.getElementById('status-text').style.color = win ? "var(--neon)" : "var(--pink)";
-    document.getElementById('sub-message').innerText = win ? "Dedication proven. Welcome to EVOLVE!" : "Try hard if u want to join EVOLVE.";
+    const statusText = document.getElementById('status-text');
+    const subMsg = document.getElementById('sub-message');
+    
+    if(statusText) {
+        statusText.innerText = win ? "SUCCESS" : "FAILED";
+        statusText.style.color = win ? "#00ff41" : "#ff0055";
+    }
+    if(subMsg) {
+        subMsg.innerText = win ? "Dedication proven. Welcome to EVOLVE!" : "Try hard if u want to join EVOLVE.";
+    }
+    
     if(win) {
         fxMode = 'cracker';
         setInterval(() => {
-            for(let i=0; i<20; i++) particles.push(new Particle(Math.random()*fxCanvas.width, Math.random()*fxCanvas.height, '#ff0055', 8, 3));
+            for(let i=0; i<20; i++) particles.push(new Particle(Math.random()*fxCanvas.width, Math.random()*fxCanvas.height, '#00ff41', 8, 3));
         }, 200);
     }
 }
